@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="MediBot — AI-powered medical assistant for pharmaceutical and health-related questions." />
+  <title>MediBot — Medical AI Assistant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>" />
+</head>
+<body>
+
+  <!-- Animated background -->
+  <div class="bg-effects">
+    <div class="bg-orb bg-orb--1"></div>
+    <div class="bg-orb bg-orb--2"></div>
+    <div class="bg-orb bg-orb--3"></div>
+  </div>
+  <div class="bg-grid"></div>
+
+  <div class="app-container">
+
+    <!-- ===== Header ===== -->
+    <header class="header" id="app-header">
+      <div class="header__brand">
+        <div class="header__icon">🩺</div>
+        <div>
+          <div class="header__title">MediBot</div>
+          <div class="header__subtitle">AI Medical Assistant</div>
+        </div>
+      </div>
+      <div class="header__status">
+        <span class="status-dot"></span>
+        <span>Online</span>
+      </div>
+    </header>
+
+    <!-- ===== Chat Area ===== -->
+    <main class="chat-container" id="chat-container">
+
+      <!-- Welcome Card (shown initially) -->
+      <div class="welcome-card" id="welcome-card">
+        <div class="welcome-card__icon">🩺</div>
+        <h1 class="welcome-card__title">How can I help you today?</h1>
+        <p class="welcome-card__desc">
+          I'm your AI medical assistant. Ask me anything about medications, symptoms, treatments, or general health information.
+        </p>
+        <div class="quick-prompts" id="quick-prompts">
+          <button class="quick-prompt-btn" data-prompt="What are common side effects of ibuprofen?">💊 Ibuprofen side effects</button>
+          <button class="quick-prompt-btn" data-prompt="Explain the difference between Type 1 and Type 2 diabetes">🔬 Diabetes types</button>
+          <button class="quick-prompt-btn" data-prompt="What are the symptoms of hypertension?">❤️ Hypertension symptoms</button>
+          <button class="quick-prompt-btn" data-prompt="How does an antibiotic work?">🧬 How antibiotics work</button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Typing indicator (hidden by default) -->
+    <div class="typing-indicator" id="typing-indicator">
+      <div class="message__avatar">🩺</div>
+      <div class="typing__dots">
+        <span class="typing__dot"></span>
+        <span class="typing__dot"></span>
+        <span class="typing__dot"></span>
+      </div>
+    </div>
+
+    <!-- ===== Input Area ===== -->
+    <div class="input-area" id="input-area">
+      <form class="input-wrapper" id="chat-form" autocomplete="off">
+        <input
+          type="text"
+          id="chat-input"
+          placeholder="Ask a medical question..."
+          autofocus
+          required
+        />
+        <button type="submit" id="send-btn" aria-label="Send message">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </div>
+
+    <div class="disclaimer">
+      ⚕️ MediBot provides general information only. Always consult a healthcare professional for medical advice.
+    </div>
+
+  </div>
+
+  <script>
+    // === DOM References ===
+    const chatContainer  = document.getElementById('chat-container');
+    const chatForm       = document.getElementById('chat-form');
+    const chatInput      = document.getElementById('chat-input');
+    const sendBtn        = document.getElementById('send-btn');
+    const typingIndicator= document.getElementById('typing-indicator');
+    const welcomeCard    = document.getElementById('welcome-card');
+    const quickPrompts   = document.getElementById('quick-prompts');
+
+    let isProcessing = false;
+
+    // === Utilities ===
+    function getTimestamp() {
+      return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function scrollToBottom() {
+      requestAnimationFrame(() => {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      });
+    }
+
+    function hideWelcome() {
+      if (welcomeCard) {
+        welcomeCard.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        welcomeCard.style.opacity = '0';
+        welcomeCard.style.transform = 'scale(0.96)';
+        setTimeout(() => welcomeCard.remove(), 300);
+      }
+    }
+
+    // === Create Message Bubble ===
+    function appendMessage(text, sender) {
+      const row = document.createElement('div');
+      row.className = `message-row message-row--${sender}`;
+
+      const avatar = document.createElement('div');
+      avatar.className = 'message__avatar';
+      avatar.textContent = sender === 'bot' ? '🩺' : '👤';
+
+      const contentWrap = document.createElement('div');
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message__bubble';
+      bubble.textContent = text;
+
+      const time = document.createElement('div');
+      time.className = 'message__time';
+      time.textContent = getTimestamp();
+
+      contentWrap.appendChild(bubble);
+      contentWrap.appendChild(time);
+
+      row.appendChild(avatar);
+      row.appendChild(contentWrap);
+
+      chatContainer.appendChild(row);
+      scrollToBottom();
+    }
+
+    // === Show / Hide Typing ===
+    function showTyping() {
+      typingIndicator.classList.add('active');
+      scrollToBottom();
+    }
+
+    function hideTyping() {
+      typingIndicator.classList.remove('active');
+    }
+
+    // === Send Message ===
+    async function sendMessage(userText) {
+      if (isProcessing || !userText.trim()) return;
+
+      isProcessing = true;
+      sendBtn.disabled = true;
+      hideWelcome();
+
+      // Show user message
+      appendMessage(userText.trim(), 'user');
+      chatInput.value = '';
+
+      // Show typing indicator
+      showTyping();
+
+      try {
+        const formData = new FormData();
+        formData.append('msg', userText.trim());
+
+        const response = await fetch('/get', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error('Network response error');
+
+        const data = await response.json();
+        hideTyping();
+        appendMessage(data.response || 'Sorry, I could not process that.', 'bot');
+      } catch (error) {
+        hideTyping();
+        appendMessage('Sorry, something went wrong. Please try again.', 'bot');
+        console.error('Chat error:', error);
+      } finally {
+        isProcessing = false;
+        sendBtn.disabled = false;
+        chatInput.focus();
+      }
+    }
+
+    // === Event Listeners ===
+    chatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      sendMessage(chatInput.value);
+    });
+
+    // Quick prompt buttons
+    quickPrompts.addEventListener('click', (e) => {
+      const btn = e.target.closest('.quick-prompt-btn');
+      if (btn) {
+        const prompt = btn.getAttribute('data-prompt');
+        sendMessage(prompt);
+      }
+    });
+  </script>
+
+</body>
+</html>
